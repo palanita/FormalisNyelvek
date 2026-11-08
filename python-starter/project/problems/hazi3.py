@@ -59,10 +59,7 @@ class MinimizationProblem(Problem):
 
             rendezett_abece = sorted(set(abece))
 
-            # --- MINIMALIZÁLÁS (Moore-algoritmus / Partíció finomítás) ---
-            allapotok_lista = list(eredeti_allapotok)
-
-            # Elérhetőségi szűrés (csak azokat az állapotokat tartjuk meg, amelyek elérhetőek a kezdőállapotból)
+            # --- 1. LÉPÉS: Elérhetőségi szűrés ---
             elerheto = set()
             queue = [kezdoallapot]
             elerheto.add(kezdoallapot)
@@ -74,62 +71,99 @@ class MinimizationProblem(Problem):
                         elerheto.add(nxt)
                         queue.append(nxt)
 
-            aktiv_allapotok = [st for st in allapotok_lista if st in elerheto]
+            allapotok_lista = sorted(list(elerheto), key=lambda x: int(''.join(filter(str.isdigit, x))) if any(
+                char.isdigit() for char in x) else x)
+            n = len(allapotok_lista)
 
-            # Kezdeti partíciók: Végállapotok és Nem-végállapotok
-            P = [
-                set(st for st in aktiv_allapotok if st in vegallapotok),
-                set(st for st in aktiv_allapotok if st not in vegallapotok)
-            ]
-            P = [g for g in P if g]  # Üres csoportok kiszűrése
-            W = list(P)
+            # --- 2. LÉPÉS: Háromszögmátrix (állapotpár-táblázat) inicializálása ---
+            # distinguished[i][j] jelöli, hogy az allapotok_lista[i] és allapotok_lista[j] meg van-e különböztetve (ahol i < j)
+            distinguished = [[False] * n for _ in range(n)]
 
-            while W:
-                A = W.pop(0)
-                for c in rendezett_abece:
-                    # Előképek gyűjtése c szimbólummal
-                    X = set()
-                    for s in aktiv_allapotok:
-                        nxt = atmenet_map.get((s, c))
-                        if nxt in A:
-                            X.add(s)
+            # Kezdeti megkülönböztetés: ha az egyik végállapot, a másik pedig nem
+            for i in range(n):
+                for j in range(i + 1, n):
+                    st1 = allapotok_lista[i]
+                    st2 = allapotok_lista[j]
+                    is_st1_final = st1 in vegallapotok
+                    is_st2_final = st2 in vegallapotok
+                    if is_st1_final != is_st2_final:
+                        distinguished[i][j] = True
 
-                    new_P = []
-                    for Y in P:
-                        intersection = Y.intersection(X)
-                        difference = Y.difference(X)
-                        if intersection and difference:
-                            new_P.append(intersection)
-                            new_P.append(difference)
-                            if Y in W:
-                                W.remove(Y)
-                                W.append(intersection)
-                                W.append(difference)
-                            else:
-                                if len(intersection) <= len(difference):
-                                    W.append(intersection)
-                                else:
-                                    W.append(difference)
-                        else:
-                            new_P.append(Y)
-                    P = new_P
+            # --- 3. LÉPÉS: Iteratív kitöltés az átmenetek alapján ---
+            changed = True
+            while changed:
+                changed = False
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        if not distinguished[i][j]:
+                            st1 = allapotok_lista[i]
+                            st2 = allapotok_lista[j]
+                            # Megvizsgáljuk az összes szimbólum szerinti átmenetet
+                            for symb in rendezett_abece:
+                                nxt1 = atmenet_map.get((st1, symb))
+                                nxt2 = atmenet_map.get((st2, symb))
 
-            # Az egyes ekvivalencia-osztályok rendezése és új név hozzárendelése
-            # Az új név az osztály legkisebb eredeti neve lesz
-            osztaly_map = {}  # eredeti_allapot -> új_név (s-el kezdődve)
+                                # Ha valamelyik átmenet nem létezik (hiányos automata), vagy kezeljük a nem teljes automata esetét:
+                                # (A feladat elején említve van a determinisztikussá és teljessé tétel is, de itt feltételezzük,
+                                # hogy a megadott párok vagy mindkettő léteznek, vagy ha az egyik hiányzik, azt kezelni kell.
+                                # Ha mindkettő létezik, megnézzük a mátrixban lévő értéküket.)
+                                if nxt1 and nxt2 and nxt1 != nxt2:
+                                    # Megkeressük nxt1 és nxt2 indexét az allapotok_lista-ban
+                                    idx1 = allapotok_lista.index(nxt1)
+                                    idx2 = allapotok_lista.index(nxt2)
+                                    # Indexek sorrendje: mindig idx_A < idx_B legyen a mátrix eléréséhez
+                                    row, col = min(idx1, idx2), max(idx1, idx2)
+                                    if distinguished[row][col]:
+                                        distinguished[i][j] = True
+                                        changed = True
+                                        break
+                                elif (nxt1 is None) != (nxt2 is None):
+                                    # Ha az egyik átmenet létezik, a másik nem, akkor megkülönböztetettek
+                                    distinguished[i][j] = True
+                                    changed = True
+                                    break
+
+            # --- 4. LÉPÉS: Ekvivalencia-osztályok képzése a meg nem különböztetett párok alapján ---
+            parent = list(range(n))
+
+            def find(i: int) -> int:
+                if parent[i] == i:
+                    return i
+                parent[i] = find(parent[i])
+                return parent[i]
+
+            def union(i: int, j: int) -> None:
+                root_i = find(i)
+                root_j = find(j)
+                if root_i != root_j:
+                    parent[root_j] = root_i
+
+            for i in range(n):
+                for j in range(i + 1, n):
+                    if not distinguished[i][j]:
+                        union(i, j)
+
+            # Osztályok összegyűjtése indexek alapján
+            osztalyok_dict: dict[int, list[str]] = {}
+            for i in range(n):
+                root = find(i)
+                if root not in osztalyok_dict:
+                    osztalyok_dict[root] = []
+                osztalyok_dict[root].append(allapotok_lista[i])
+
+            # --- 5. LÉPÉS: Új állapotnevek hozzárendelése ---
+            # Az összevont állapotok új neve az összevont állapotok közül a legkisebb nevet kapja (s-es formátumban)
+            osztaly_map = {}  # eredeti_allapot -> új_név
             uj_allapotok_set = set()
 
-            for csoport in P:
+            for root, csoport in osztalyok_dict.items():
                 # Eredeti állapotok rendezése (ha pl. q1, q5 -> q1 a legkisebb)
                 # Tegyük fel, hogy a nevek q-val vagy más sztringgel kezdődnek, de számmal végződnek,
                 # vagy sima lexikografikus ill. numerikus rendezés:
-                sorted_csoport = sorted(list(csoport), key=lambda x: int(''.join(filter(str.isdigit, x))) if any(
+                sorted_csoport = sorted(csoport, key=lambda x: int(''.join(filter(str.isdigit, x))) if any(
                     char.isdigit() for char in x) else x)
                 reprezentans = sorted_csoport[0]
 
-                # A feladat szerint: "Az összevont állapotok új neve az összevont állapotok közül a legkisebb nevet kapja
-                # (például, ha q1 és q5 összevonódik, az új állapot neve s1 lesz)."
-                # Ha pl. q1 volt a legkisebb, akkor s1 lesz.
                 szam_resz = ''.join(filter(str.isdigit, reprezentans))
                 uj_nev = f"s{szam_resz}"
                 uj_allapotok_set.add(uj_nev)
@@ -137,13 +171,11 @@ class MinimizationProblem(Problem):
                 for st in csoport:
                     osztaly_map[st] = uj_nev
 
-            # Új állapotok rendezése s index szerint
             osszes_dfa_allapot = sorted(list(uj_allapotok_set), key=lambda x: int(x[1:]))
             elso_sor = " ".join(osszes_dfa_allapot)
             masodik_sor = " ".join(rendezett_abece)
             harmadik_sor = osztaly_map[kezdoallapot]
 
-            # Új végállapotok meghatározása
             uj_vegallapotok = set()
             for st in vegallapotok:
                 if st in osztaly_map:
@@ -152,8 +184,8 @@ class MinimizationProblem(Problem):
 
             # Új átmenetek generálása és deduplikálása
             dfa_atmenetek = set()
-            for csoport in P:
-                reprezentans = list(csoport)[0]
+            for root, csoport in osztalyok_dict.items():
+                reprezentans = csoport[0]  # Bármelyik elem jó reprezentánsnak az osztályból
                 honnan_uj = osztaly_map[reprezentans]
                 for szimbolum in rendezett_abece:
                     hova_regi = atmenet_map.get((reprezentans, szimbolum))
