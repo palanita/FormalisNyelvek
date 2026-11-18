@@ -6,9 +6,6 @@ from collections import Counter
 class RegexProblem(Problem):
 
     def initialize_parser(self, parser: argparse.ArgumentParser):
-        """
-        Initialize the parser with the necessary arguments
-        """
         parser.add_argument(
             '--rgx',
             type=int,
@@ -17,14 +14,11 @@ class RegexProblem(Problem):
         )
 
     def is_chosen_problem(self, args):
-        """
-        Check if the problem is chosen
-        """
         return bool(args.rgx)
 
     def problem1(self, data):
-        patterns = [
-            # 1. 10. hónap 15-én létrejött sorok
+        raw_patterns = [
+            # 1. 10. hónap 15-én 10:18:51-kor létrejött sorok
             r'^10-15\b',
             # 2. 10. hónap 15-én 10:18:51-kor létrejött sorok
             r'^10-15\s+10:18:51\.',
@@ -45,66 +39,72 @@ class RegexProblem(Problem):
             # 10. Thread szó a message részben (nem a tagben: a tag és a ':' után)
             r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+[VDIWEFS]\s+[^:]+:.*\bThread\b'
         ]
+        # Előre lefordítjuk a mintákat a gyorsabb futásért
+        patterns = [re.compile(p) for p in raw_patterns]
+        counts = [0] * len(patterns)
 
-        counts = [str(len(re.findall(p, data, re.MULTILINE))) for p in patterns]
-        result = "\n".join(counts)
-        return result
+        for line in data:
+            for i, pattern in enumerate(patterns):
+                if pattern.search(line):
+                    counts[i] += 1
 
-    def problem2(self, data):
-        pattern = r'\bE\b.*?\bat\s+[\w.$]+\(([^():]+\.java):\d+\)'
-        result = re.findall(pattern, data)
-        return result
+        return "\n".join(str(c) for c in counts)
 
-    def problem3(self, data):
-        pattern = r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+(\d+)\s+\d+\s+[VDIWEFS]\b'
-        pids = re.findall(pattern, data, re.MULTILINE)
-        unique_pids = dict.fromkeys(pids)
-        result = "\n".join(unique_pids)
-        return result
+    def problem2(self, lines):
+        pattern = re.compile(r'\bE\b.*?\bat\s+[\w.$]+\(([^():]+\.java):\d+\)')
+        matches = []
+        for line in lines:
+            matches.extend(pattern.findall(line))
+        return "\n".join(matches)
 
-    def problem4(self, data):
-        pattern = r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+(\d+)\s+\d+\s+E\b'
-        error_pids = re.findall(pattern, data, re.MULTILINE)
+    def problem3(self, lines):
+        pattern = re.compile(r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+(\d+)\s+\d+\s+[VDIWEFS]\b')
+        unique_pids = {}
+        for line in lines:
+            match = pattern.search(line)
+            if match:
+                unique_pids[match.group(1)] = None
+        return "\n".join(unique_pids)
 
-        if not error_pids:
+    def problem4(self, lines):
+        pattern = re.compile(r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+(\d+)\s+\d+\s+E\b')
+        pid_counts = Counter()
+        for line in lines:
+            match = pattern.search(line)
+            if match:
+                pid_counts[match.group(1)] += 1
+
+        if not pid_counts:
             return ""
 
-        # Megszámolja, melyik PID hányszor fordult elő hibasorban,
-        # és visszaadja a legmagasabb előfordulású (pid, darabszám) párost.
-        top_pid, count = Counter(error_pids).most_common(1)[0]
-        result = f"PID={top_pid} ({count} errors)"
-        return result
+        top_pid, count = pid_counts.most_common(1)[0]
+        return f"PID={top_pid} ({count} errors)"
 
-    def problem5(self, data):
-        pattern = r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+(\d+)\s+\1\s+E\b'
-        matches = re.findall(pattern, data, re.MULTILINE)
-        result = len(matches)
-        return result
+    def problem5(self, lines):
+        pattern = re.compile(r'^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+(\d+)\s+\1\s+E\b')
+        count = 0
+        for line in lines:
+            if pattern.search(line):
+                count += 1
+        return count
 
     def run(self, args):
-        """
-        Run the program
-        """
-        # Access the input and output file paths
         input_file = args.input
         output_file = args.output
 
-        # Read the numbers
-        with open(input_file, 'r') as f:
-            data = f.read()
-
         # Feladatok feldolgozása a --rgx kapcsoló alapján
-        match args.rgx:
-            case 1:
-                result = self.problem1()
-            case 2:
-                result = self.problem2()
-            case 3:
-                result = self.problem3()
-            case 4:
-                result = self.problem4()
-            case 5:
-                result = self.problem5()
+        with open(input_file, 'r', encoding='utf-8', errors='replace') as f:
+            match args.rgx:
+                case 1:
+                    result = self.problem1(f)
+                case 2:
+                    result = self.problem2(f)
+                case 3:
+                    result = self.problem3(f)
+                case 4:
+                    result = self.problem4(f)
+                case 5:
+                    result = self.problem5(f)
 
         # Write the result into the file
         with open(output_file, 'w') as f:
