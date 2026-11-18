@@ -51,7 +51,7 @@ class RegexProblem(Problem):
         return "\n".join(str(c) for c in counts)
 
     def problem2(self, lines):
-        pattern = re.compile(r'\bE\b.*?\bat\s+[\w.$]+\(([^():]+\.java):\d+\)')
+        pattern = re.compile(r'\bE\b.*?\bat\s+[\w.$]+\(([^():]+):\d+\)')
         matches = []
         for line in lines:
             matches.extend(pattern.findall(line))
