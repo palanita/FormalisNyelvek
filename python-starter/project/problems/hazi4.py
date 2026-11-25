@@ -25,19 +25,19 @@ class RegexProblem(Problem):
             # 3. 51 másodperckor létrejött sorok (mindegy a perc)
             r'^\d{2}-\d{2} \d{2}:\d{2}:51\.',
             # 4. lowmemorykiller taget tartalmazó sorok
-            r'^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+[VDIWEF]\s+lowmemorykiller\s*:',
+            r'^[0-9-]+ +[0-9:.]+ +[0-9]+ +[0-9]+ [IDVEFAW] lowmemorykiller *:',
             # 5. 10:18:51-kor keletkező 221-es process id-jú sorok
-            r'^\d{2}-\d{2} 10:18:51\.\d{3}\s+221\s+\d+',
+            r'^\d{2}-\d{2} 10:18:51\.\d+ +221\b',
             # 6. összes hibát tartalmazó sor (E)
-            r'^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+E\s',
+            r'^[0-9-]+ +[0-9:.]+ +[0-9]+ +[0-9]+ E ',
             # 7. összes warning (W) amit a PackageManager küld
-            r'^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+W\s+PackageManager\s*:',
+            r'^[0-9-]+ +[0-9:.]+ +[0-9]+ +[0-9]+ W PackageManager *:',
             # 8. összes ExoPlayer-es debug (D) infó (ExoPlayer vagy ExoPlayerImpl stb. tag)
-            r'^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+D\s+[^:]*ExoPlayer[^:]*:',
+            r'\s+D\s+.*ExoPlayer',
             # 9. összes java állomány pozíciót tartalmazó hiba és warning (E/W + .java:)
-            r'^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+[EW]\s+.*\.java:',
+            r'^[0-9-]+ +[0-9:.]+ +[0-9]+ +[0-9]+ [EW] [^:]*:.*\.java:',
             # 10. Thread szó a message részben (nem a tagben: a tag és a ':' után)
-            r'^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+[VDIWEF]\s+[^:]+:.*\bThread\b'
+            r'^([0-9-]+ +[0-9:.]+) +([0-9]+) +([0-9]+) ([IDVEFAW]) (.+?): (?:(.+))?'
         ]
         # Előre lefordítjuk a mintákat a gyorsabb futásért
         patterns = [re.compile(p) for p in raw_patterns]
@@ -54,7 +54,7 @@ class RegexProblem(Problem):
         # Keresés a .java fájlok nevére és a sorok számára
         # A buktató az, hogy a log sorokban a tag és a message között lehetnek ':' karakterek,
         # ezért a regex-nek a legutolsó ':' karaktert kell figyelembe vennie
-        pattern = re.compile(r'^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+E\s+[^:]+:.*\(([A-Za-z0-9_$]+\.java):\d+\)')
+        pattern = re.compile(r'^([0-9-]+ [0-9:.]+) +([0-9]+) +([0-9]+) E (.+?): .*\(([A-Za-z0-9_$]+\.java):[0-9]+\)')
         matches = []
         for line in lines:
             matches.extend(pattern.findall(line))
