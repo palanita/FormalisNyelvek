@@ -37,7 +37,7 @@ class RegexProblem(Problem):
             # 9. összes java állomány pozíciót tartalmazó hiba és warning (E/W + .java:)
             r'^[0-9-]+ +[0-9:.]+ +[0-9]+ +[0-9]+ [EW] [^:]*:.*\.java:',
             # 10. Thread szó a message részben (nem a tagben: a tag és a ':' után)
-            r'^([0-9-]+ +[0-9:.]+) +([0-9]+) +([0-9]+) ([IDVEFAW]) (.+?): (?:(.+))?'
+            r"^(?:[^:]*:){3}.*Thread"
         ]
         # Előre lefordítjuk a mintákat a gyorsabb futásért
         patterns = [re.compile(p) for p in raw_patterns]
