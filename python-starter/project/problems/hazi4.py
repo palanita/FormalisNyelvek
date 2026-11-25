@@ -54,7 +54,8 @@ class RegexProblem(Problem):
         # Keresés a .java fájlok nevére és a sorok számára
         # A buktató az, hogy a log sorokban a tag és a message között lehetnek ':' karakterek,
         # ezért a regex-nek a legutolsó ':' karaktert kell figyelembe vennie
-        pattern = re.compile(r'^([0-9-]+ [0-9:.]+) +([0-9]+) +([0-9]+) E (.+?): .*\(([A-Za-z0-9_$]+\.java):[0-9]+\)')
+        pattern = re.compile(
+            r'^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+E\s+[^:]+:.*\(([A-Za-z0-9_$]+\.java):\d+\)')
         matches = []
         for line in lines:
             matches.extend(pattern.findall(line))
